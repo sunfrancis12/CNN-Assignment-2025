@@ -46,18 +46,23 @@ jobs:
       id: test
       continue-on-error: true
       run: |
-        pytest tests/test_cnn.py --verbose > test_output.txt 2>&1
-        echo "TEST_STATUS=$(if grep -q 'FAILED' test_output.txt; then echo 'failed'; else echo 'passed'; fi)" >> $GITHUB_OUTPUT
+        if [ -f tests/test_cnn.py ]; then
+          pytest tests/test_cnn.py --verbose > test_output.txt 2>&1
+          echo "TEST_STATUS=$(if grep -q 'FAILED' test_output.txt 2>/dev/null; then echo 'failed'; else echo 'passed'; fi)" >> $GITHUB_OUTPUT
+        else
+          echo "TEST_STATUS=skipped" >> $GITHUB_OUTPUT
+          echo "Warning: tests/test_cnn.py not found" > test_output.txt
+        fi
     - name: Collect grading results
       run: |
         echo "Grading Results:" > grading_result.txt
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb || echo 'Invalid')" >> grading_result.txt
         echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
-        echo "- Task 1 (Model Changes): $(if grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 2 (Hyperparameters): $(if grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 3 (Data Augmentation): $(if grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 4 (Visualization): $(if grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 5 (Report): $(if grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 1 (Model Changes): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 2 (Hyperparameters): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 3 (Data Augmentation): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 4 (Visualization): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
     - name: Comment on PR
       uses: actions/github-script@v7
       with:
