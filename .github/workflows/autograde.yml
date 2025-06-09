@@ -50,7 +50,9 @@ jobs:
         if [ -f tests/test_cnn.py ]; then
           pytest tests/test_cnn.py --verbose --capture=tee-sys >> test_output.txt 2>&1 || echo "Warning: pytest execution failed" >> test_output.txt
           echo "test_output.txt content after pytest:" >> test_output.txt
-          cat test_output.txt >> test_output.txt  # Duplicate content for debugging
+          # Fix: Use cp instead of cat to avoid the input/output file error
+          cp test_output.txt test_output_backup.txt
+          cat test_output_backup.txt >> test_output.txt
           if grep -q "FAILED" test_output.txt 2>/dev/null; then
             echo "TEST_STATUS=failed" >> $GITHUB_OUTPUT
           else
@@ -67,26 +69,37 @@ jobs:
         # Ensure grading_result.txt exists
         echo "Grading Results:" > grading_result.txt
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null || echo 'Invalid')" >> grading_result.txt
-        echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
+        
+        # Fix: Simplify the notebook execution check to avoid syntax errors
+        NOTEBOOK_STATUS="Success"
+        for file in *.ipynb; do
+          if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then
+            NOTEBOOK_STATUS="Failed"
+          fi
+          break
+        done
+        echo "- Notebook execution: $NOTEBOOK_STATUS" >> grading_result.txt
+        
         # Add debugging output
         echo "Debug: Checking test_output.txt existence" >> grading_result.txt
         if [ -f test_output.txt ]; then
           echo "Debug: test_output.txt exists, content:" >> grading_result.txt
           cat test_output.txt >> grading_result.txt
           echo "Debug: Running grep commands" >> grading_result.txt
-          echo "- Task 1 (Model Changes): $(grep -q 'FAILED.*test_file_name' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
-          echo "- Task 2 (Hyperparameters): $(grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
-          echo "- Task 3 (Data Augmentation): $(grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
-          echo "- Task 4 (Visualization): $(grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
-          echo "- Task 5 (Report): $(grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
-          echo "- Task 5 (Report): $(grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 1 (File Name): $(grep -q 'FAILED.*test_file_name' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 2 (Model Changes): $(grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 3 (Hyperparameters): $(grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 4 (Data Augmentation): $(grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 5 (Visualization): $(grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 6 (Report): $(grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
         else
           echo "Debug: test_output.txt does not exist" >> grading_result.txt
-          echo "- Task 1 (Model Changes): N/A" >> grading_result.txt
-          echo "- Task 2 (Hyperparameters): N/A" >> grading_result.txt
-          echo "- Task 3 (Data Augmentation): N/A" >> grading_result.txt
-          echo "- Task 4 (Visualization): N/A" >> grading_result.txt
-          echo "- Task 5 (Report): N/A" >> grading_result.txt
+          echo "- Task 1 (File Name): N/A" >> grading_result.txt
+          echo "- Task 2 (Model Changes): N/A" >> grading_result.txt
+          echo "- Task 3 (Hyperparameters): N/A" >> grading_result.txt
+          echo "- Task 4 (Data Augmentation): N/A" >> grading_result.txt
+          echo "- Task 5 (Visualization): N/A" >> grading_result.txt
+          echo "- Task 6 (Report): N/A" >> grading_result.txt
         fi
     - name: Comment on PR
       if: always()
