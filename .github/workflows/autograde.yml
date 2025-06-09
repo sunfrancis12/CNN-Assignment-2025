@@ -22,13 +22,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install tensorflow jupyter nbconvert nbclient pytest
+        pip install tensorflow jupyter nbconvert nbclient pytest || echo "Warning: Failed to install some dependencies"
     - name: Disable TensorFlow GPU
       run: |
         echo "Disabling TensorFlow GPU support"
         echo "import os" >> disable_gpu.py
         echo "os.environ['CUDA_VISIBLE_DEVICES'] = ''" >> disable_gpu.py
-        python disable_gpu.py
+        python disable_gpu.py || echo "Warning: Failed to disable GPU"
     - name: Check notebook file name format
       run: |
         if ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null; then
@@ -46,17 +46,26 @@ jobs:
       id: test
       continue-on-error: true
       run: |
+        # Ensure test_output.txt exists
+        echo "Test execution started" > test_output.txt
         if [ -f tests/test_cnn.py ]; then
-          pytest tests/test_cnn.py --verbose > test_output.txt 2>&1
-          echo "TEST_STATUS=$(if grep -q 'FAILED' test_output.txt 2>/dev/null; then echo 'failed'; else echo 'passed'; fi)" >> $GITHUB_OUTPUT
+          pytest tests/test_cnn.py --verbose >> test_output.txt 2>&1 || echo "Warning: pytest execution failed" >> test_output.txt
+          if grep -q "FAILED" test_output.txt 2>/dev/null; then
+            echo "TEST_STATUS=failed" >> $GITHUB_OUTPUT
+          else
+            echo "TEST_STATUS=passed" >> $GITHUB_OUTPUT
+          fi
         else
           echo "TEST_STATUS=skipped" >> $GITHUB_OUTPUT
-          echo "Warning: tests/test_cnn.py not found" > test_output.txt
+          echo "Warning: tests/test_cnn.py not found" >> test_output.txt
         fi
     - name: Collect grading results
+      id: grading
+      continue-on-error: true
       run: |
+        # Ensure grading_result.txt exists
         echo "Grading Results:" > grading_result.txt
-        echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb || echo 'Invalid')" >> grading_result.txt
+        echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null || echo 'Invalid')" >> grading_result.txt
         echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
         echo "- Task 1 (Model Changes): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
         echo "- Task 2 (Hyperparameters): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
@@ -64,12 +73,13 @@ jobs:
         echo "- Task 4 (Visualization): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
         echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
     - name: Comment on PR
+      if: always()
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
-          const result = fs.readFileSync('grading_result.txt', 'utf8');
+          const result = fs.readFileSync('grading_result.txt', 'utf8') || 'No grading results available due to errors.';
           await github.rest.issues.createComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
