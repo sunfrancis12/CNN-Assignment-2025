@@ -46,10 +46,11 @@ jobs:
       id: test
       continue-on-error: true
       run: |
-        # Ensure test_output.txt exists and capture detailed output
         echo "Test execution started at $(date)" > test_output.txt
         if [ -f tests/test_cnn.py ]; then
           pytest tests/test_cnn.py --verbose --capture=tee-sys >> test_output.txt 2>&1 || echo "Warning: pytest execution failed" >> test_output.txt
+          echo "test_output.txt content after pytest:" >> test_output.txt
+          cat test_output.txt >> test_output.txt  # Duplicate content for debugging
           if grep -q "FAILED" test_output.txt 2>/dev/null; then
             echo "TEST_STATUS=failed" >> $GITHUB_OUTPUT
           else
@@ -67,14 +68,26 @@ jobs:
         echo "Grading Results:" > grading_result.txt
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null || echo 'Invalid')" >> grading_result.txt
         echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
-        # Use more specific grep pattern to match pytest output
-        echo "- Task 1 (Model Changes): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_file_name' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 2 (Hyperparameters): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 3 (Data Augmentation): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 4 (Visualization): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        # Add check for Task 5 report separately
-        echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        # Add debugging output
+        echo "Debug: Checking test_output.txt existence" >> grading_result.txt
+        if [ -f test_output.txt ]; then
+          echo "Debug: test_output.txt exists, content:" >> grading_result.txt
+          cat test_output.txt >> grading_result.txt
+          echo "Debug: Running grep commands" >> grading_result.txt
+          echo "- Task 1 (Model Changes): $(grep -q 'FAILED.*test_file_name' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 2 (Hyperparameters): $(grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 3 (Data Augmentation): $(grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 4 (Visualization): $(grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 5 (Report): $(grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+          echo "- Task 5 (Report): $(grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null && echo 'Fail' || echo 'Pass')" >> grading_result.txt
+        else
+          echo "Debug: test_output.txt does not exist" >> grading_result.txt
+          echo "- Task 1 (Model Changes): N/A" >> grading_result.txt
+          echo "- Task 2 (Hyperparameters): N/A" >> grading_result.txt
+          echo "- Task 3 (Data Augmentation): N/A" >> grading_result.txt
+          echo "- Task 4 (Visualization): N/A" >> grading_result.txt
+          echo "- Task 5 (Report): N/A" >> grading_result.txt
+        fi
     - name: Comment on PR
       if: always()
       uses: actions/github-script@v7
