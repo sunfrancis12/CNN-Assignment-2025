@@ -46,10 +46,10 @@ jobs:
       id: test
       continue-on-error: true
       run: |
-        # Ensure test_output.txt exists
-        echo "Test execution started" > test_output.txt
+        # Ensure test_output.txt exists and capture detailed output
+        echo "Test execution started at $(date)" > test_output.txt
         if [ -f tests/test_cnn.py ]; then
-          pytest tests/test_cnn.py --verbose >> test_output.txt 2>&1 || echo "Warning: pytest execution failed" >> test_output.txt
+          pytest tests/test_cnn.py --verbose --capture=tee-sys >> test_output.txt 2>&1 || echo "Warning: pytest execution failed" >> test_output.txt
           if grep -q "FAILED" test_output.txt 2>/dev/null; then
             echo "TEST_STATUS=failed" >> $GITHUB_OUTPUT
           else
@@ -67,10 +67,13 @@ jobs:
         echo "Grading Results:" > grading_result.txt
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null || echo 'Invalid')" >> grading_result.txt
         echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
-        echo "- Task 1 (Model Changes): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 2 (Hyperparameters): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 3 (Data Augmentation): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
-        echo "- Task 4 (Visualization): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        # Use more specific grep pattern to match pytest output
+        echo "- Task 1 (Model Changes): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_file_name' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 2 (Hyperparameters): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_1_model_changes' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 3 (Data Augmentation): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_2_hyperparameters' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 4 (Visualization): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_3_data_augmentation' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_4_visualization' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
+        # Add check for Task 5 report separately
         echo "- Task 5 (Report): $(if [ -f test_output.txt ] && grep -q 'FAILED.*test_task_5_report' test_output.txt 2>/dev/null; then echo 'Fail'; else echo 'Pass'; fi)" >> grading_result.txt
     - name: Comment on PR
       if: always()
