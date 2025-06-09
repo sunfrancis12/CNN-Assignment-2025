@@ -1,0 +1,61 @@
+name: Autograde CNN Assignment
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  autograde:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.ref }}
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tensorflow jupyter nbconvert pytest pytest-nbval nbformat
+    - name: Check notebook file name format
+      run: |
+        if ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null; then
+          echo "Valid notebook file name found."
+        else
+          echo "Error: Notebook file name must follow 'ClassNumber_CNN_Assignment.ipynb' format (e.g., ACS109145_CNN_Assignment.ipynb)"
+          exit 1
+        fi
+    - name: Run notebook
+      run: |
+        for file in *.ipynb; do
+          jupyter nbconvert --to python "$file"
+          python "${file%.ipynb}.py" || { echo "Error: Failed to execute $file"; exit 1; }
+        done
+    - name: Run custom tests
+      run: |
+        pytest tests/test_cnn.py --verbose || { echo "Error: Test validation failed"; exit 1; }
+    - name: Collect grading results
+      run: |
+        echo "Grading Results:" > grading_result.txt
+        echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb || echo 'Invalid')" >> grading_result.txt
+        echo "- Notebook execution: Success" >> grading_result.txt
+        echo "- Task 1 (Model Changes): $(pytest tests/test_cnn.py -k test_task_1_model_changes --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
+        echo "- Task 2 (Hyperparameters): $(pytest tests/test_cnn.py -k test_task_2_hyperparameters --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
+        echo "- Task 3 (Data Augmentation): $(pytest tests/test_cnn.py -k test_task_3_data_augmentation --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
+        echo "- Task 4 (Visualization): $(pytest tests/test_cnn.py -k test_task_4_visualization --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
+        echo "- Task 5 (Report): $(pytest tests/test_cnn.py -k test_task_5_report --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const result = fs.readFileSync('grading_result.txt', 'utf8');
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `Autograding Result:\n\n\`\`\`\n${result}\n\`\`\`\nPlease check the results and update your PR if needed.`
+          });
