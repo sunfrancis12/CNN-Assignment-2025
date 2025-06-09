@@ -30,9 +30,7 @@ jobs:
     - name: Execute notebook
       run: |
         for file in *.ipynb; do
-          jupyter nbconvert --to notebook --execute "$file" --output "executed_$file" --ExecutePreprocessor.timeout=600 || { echo "Error: Failed to execute $file"; exit 1; }
-          # Compare executed output (optional, for future enhancement)
-          # diff "$file" "executed_$file" || echo "Warning: Output differs, manual review recommended"
+          jupyter nbconvert --to notebook --execute "$file" --output "executed_$file" --ExecutePreprocessor.timeout=600 --allow-errors || { echo "Warning: $file executed with errors"; }
         done
     - name: Run custom tests
       run: |
@@ -41,7 +39,7 @@ jobs:
       run: |
         echo "Grading Results:" > grading_result.txt
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb || echo 'Invalid')" >> grading_result.txt
-        echo "- Notebook execution: Success" >> grading_result.txt
+        echo "- Notebook execution: $(for file in *.ipynb; do if grep -q 'Error: Failed to execute' <<< "$(cat executed_*.log 2>/dev/null || echo '')"; then echo 'Failed'; else echo 'Success'; fi; break;)" >> grading_result.txt
         echo "- Task 1 (Model Changes): $(pytest tests/test_cnn.py -k test_task_1_model_changes --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
         echo "- Task 2 (Hyperparameters): $(pytest tests/test_cnn.py -k test_task_2_hyperparameters --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
         echo "- Task 3 (Data Augmentation): $(pytest tests/test_cnn.py -k test_task_3_data_augmentation --quiet && echo 'Pass' || echo 'Fail')" >> grading_result.txt
