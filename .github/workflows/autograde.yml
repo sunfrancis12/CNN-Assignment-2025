@@ -22,7 +22,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install tensorflow jupyter nbconvert nbclient pytest || echo "Warning: Failed to install some dependencies"
+        pip install tensorflow jupyter nbconvert nbclient pytest scikit-learn seaborn || echo "Warning: Failed to install some dependencies"
     - name: Disable TensorFlow GPU
       run: |
         echo "Disabling TensorFlow GPU support"
@@ -38,10 +38,49 @@ jobs:
           exit 1
         fi
     - name: Execute notebook
+      continue-on-error: true
       run: |
-        for file in *.ipynb; do
-          jupyter nbconvert --to notebook --execute "$file" --output "executed_$file" --ExecutePreprocessor.timeout=300 --allow-errors --ExecutePreprocessor.kernel_name=python3 > "executed_$file.log" 2>&1 || { echo "Warning: $file executed with errors or timed out" >> "executed_$file.log"; }
+        # Set environment variables for CI execution
+        export CI=true
+        export GITHUB_ACTIONS=true
+        
+        # Execute notebook with timeout and error handling
+        for file in *_CNN_Assignment.ipynb; do
+          if [ -f "$file" ]; then
+            echo "Executing notebook: $file"
+            timeout 1800 jupyter nbconvert --to notebook --execute "$file" \
+              --output "executed_$file" \
+              --ExecutePreprocessor.timeout=1500 \
+              --ExecutePreprocessor.kernel_name=python3 \
+              --allow-errors > "executed_$file.log" 2>&1
+            
+            if [ $? -eq 0 ]; then
+              echo "Notebook executed successfully"
+              echo "NOTEBOOK_STATUS=success" >> $GITHUB_ENV
+            else
+              echo "Notebook execution failed or timed out"
+              echo "NOTEBOOK_STATUS=failed" >> $GITHUB_ENV
+            fi
+          fi
         done
+    - name: Extract model accuracy
+      continue-on-error: true
+      run: |
+        # Check for accuracy file created by notebook
+        if [ -f "model_accuracy.txt" ]; then
+          echo "Found model accuracy file:"
+          cat model_accuracy.txt
+          echo "MODEL_ACCURACY_FOUND=true" >> $GITHUB_ENV
+        else
+          echo "Model accuracy file not found"
+          echo "MODEL_ACCURACY_FOUND=false" >> $GITHUB_ENV
+        fi
+        
+        # Also check execution logs for accuracy information
+        if ls executed_*.log 2>/dev/null; then
+          echo "Searching for accuracy in execution logs:"
+          grep -i "accuracy\|loss" executed_*.log | tail -10 || echo "No accuracy information found in logs"
+        fi
     - name: Run custom tests
       id: test
       continue-on-error: true
@@ -71,14 +110,20 @@ jobs:
         echo "- File name format: $(ls *[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]_CNN_Assignment.ipynb 2>/dev/null || echo 'Invalid')" >> grading_result.txt
         
         # Fix: Simplify the notebook execution check to avoid syntax errors
-        NOTEBOOK_STATUS="Success"
-        for file in *.ipynb; do
-          if grep -q 'ERROR' executed_*.log 2>/dev/null || grep -q 'timed out' executed_*.log 2>/dev/null; then
-            NOTEBOOK_STATUS="Failed"
-          fi
-          break
-        done
-        echo "- Notebook execution: $NOTEBOOK_STATUS" >> grading_result.txt
+        if [ "$NOTEBOOK_STATUS" = "success" ]; then
+          NOTEBOOK_EXECUTION="Success"
+        else
+          NOTEBOOK_EXECUTION="Failed"
+        fi
+        echo "- Notebook execution: $NOTEBOOK_EXECUTION" >> grading_result.txt
+        
+        # Add model accuracy information
+        if [ "$MODEL_ACCURACY_FOUND" = "true" ]; then
+          echo "- Model Performance:" >> grading_result.txt
+          cat model_accuracy.txt | sed 's/^/  /' >> grading_result.txt
+        else
+          echo "- Model Performance: Not available (execution may have failed)" >> grading_result.txt
+        fi
         
         # Add debugging output
         echo "Debug: Checking test_output.txt existence" >> grading_result.txt
